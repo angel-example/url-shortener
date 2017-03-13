@@ -13,11 +13,11 @@ main() async {
   String host = "localhost";
   String addr = "${host}:${port}";
 
-  Db db = new Db("mongodb://${addr}/urlshortenerdxb");
+  Db db = new Db("mongodb://${addr}/urlshortenerdb");
   await db.open();
   urls = db.collection("urls");
   serve();
-  // TODO await db.close();
+  // db.close();
 }
 
 @Route("/")
