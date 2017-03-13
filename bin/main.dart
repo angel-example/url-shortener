@@ -6,6 +6,11 @@ import "package:mongo_dart/mongo_dart.dart";
 import "package:uuid/uuid.dart";
 
 final html = new ContentType("text", "html", charset: "utf-8");
+final urlRegex = new RegExp("(https?:\/\/(?:www\.|(?!www))[^\s\.]+\.[^\s]{2,}|www\.[^\s]+\.[^\s]{2,})");
+final indexT = new Template(new File("views/index.mustache"));
+final createT = new Template(new File("views/create.mustache"));
+final errorT = new Template(new File("views/error.mustache"));
+
 DbCollection urls;
 
 main() async {
@@ -22,29 +27,36 @@ main() async {
 
 @Route("/")
 index(HttpRequest request) async {
-  var index = new Template(new File("views/index.mustache"));
   request.response.headers.contentType = html;
-  request.response.write(index.render({"title" : "Dart URL Shortener", "num" : await urls.count()}));
+  request.response.write(indexT.render({"title" : "Dart URL Shortener", "num" : await urls.count()}));
   request.response.close();
 }
 
 @Route("/create")
 create(HttpRequest request) async {
-  var create = new Template(new File("views/create.mustache"));
+  if (request.method != "POST") {
+    request.response.close();
+    return;
+  }
+
   var url = new String.fromCharCodes((await request.toList())[0]);
   url = Uri.decodeComponent(url.substring(url.indexOf("=", 0) + 1));
-  print(url);
+  request.response.headers.contentType = html;
 
-  // TODO have a regex checking if it's a valid URL
-  if (!url.startsWith("http://"))
-    url = "http://${url}/";
+  if (url.startsWith("www."))
+    url = "http://${url}";
+  if (!urlRegex.hasMatch(url)) {
+    request.response.write(errorT.render({"message" : "Invalid URL (Does your URL begin with 'http://' or 'www.'?)"}));
+    request.response.close();
+    return;
+  }
+
   var id = _generateID(6);
   while (await mapById(id) != null)
     id = _generateID(6);
   urls.insert({"id" : id, "url" : url});
 
-  request.response.headers.contentType = html;
-  request.response.write(create.render({"location" : "${id}"}));
+  request.response.write(createT.render({"location" : "${id}"}));
   request.response.close();
 }
 
@@ -53,8 +65,10 @@ redirect(HttpRequest request, String id) async {
   if (id == "favicon.ico")
     return;
   var result = await mapById(id);
-  if (result != null)
+  if (result != null) {
     request.response.redirect(Uri.parse(result["url"]));
+    request.response.close();
+  }
 }
 
 Future<Map> mapById(String id) {
