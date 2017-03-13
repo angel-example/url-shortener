@@ -1,4 +1,5 @@
 import "dart:io";
+import "dart:async";
 import "package:url_shortener/template.dart";
 import "package:vane/vane_server.dart";
 import "package:mongo_dart/mongo_dart.dart";
@@ -36,7 +37,7 @@ create(HttpRequest request) async {
     url = "http://${url}/";
   if (url != null) {
     var id = _generateID(6);
-    while ((await urls.findOne(where.eq("id", id))) != null)
+    while (await mapById(id) != null)
       id = _generateID(6);
     urls.insert({"id" : id, "url" : url});
 
@@ -50,9 +51,13 @@ create(HttpRequest request) async {
 redirect(HttpRequest request, String id) async {
   if (id == "favicon.ico")
     return;
-  var url = await urls.findOne(where.eq("id", id));
-  if (url != null)
-    request.response.redirect(Uri.parse(url["url"]));
+  var result = await mapById(id);
+  if (result != null)
+    request.response.redirect(Uri.parse(result["url"]));
+}
+
+Future<Map> mapById(String id) {
+  return urls.findOne(where.eq("id", id));
 }
 
 String _generateID(int length) {
