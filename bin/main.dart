@@ -13,7 +13,7 @@ main() async {
   String host = "localhost";
   String addr = "${host}:${port}";
 
-  Db db = new Db("mongodb://${addr}/urlshortenerdb");
+  Db db = new Db("mongodb://${addr}/urlshortenerdxb");
   await db.open();
   urls = db.collection("urls");
   serve();
@@ -21,30 +21,31 @@ main() async {
 }
 
 @Route("/")
-void index(HttpRequest request) {
+index(HttpRequest request) async {
   var index = new Template(new File("views/index.mustache"));
   request.response.headers.contentType = html;
-  request.response.write(index.render({}));
+  request.response.write(index.render({"title" : "Dart URL Shortener", "num" : await urls.count()}));
   request.response.close();
 }
 
 @Route("/create")
 create(HttpRequest request) async {
   var create = new Template(new File("views/create.mustache"));
-  var url = request.uri.queryParameters["url"];
+  var url = new String.fromCharCodes((await request.toList())[0]);
+  url = Uri.decodeComponent(url.substring(url.indexOf("=", 0) + 1));
+  print(url);
+
   // TODO have a regex checking if it's a valid URL
   if (!url.startsWith("http://"))
     url = "http://${url}/";
-  if (url != null) {
-    var id = _generateID(6);
-    while (await mapById(id) != null)
-      id = _generateID(6);
-    urls.insert({"id" : id, "url" : url});
+  var id = _generateID(6);
+  while (await mapById(id) != null)
+    id = _generateID(6);
+  urls.insert({"id" : id, "url" : url});
 
-    request.response.headers.contentType = html;
-    request.response.write(create.render({"location" : "${id}"}));
-    request.response.close();
-  }
+  request.response.headers.contentType = html;
+  request.response.write(create.render({"location" : "${id}"}));
+  request.response.close();
 }
 
 @Route("/{id}")

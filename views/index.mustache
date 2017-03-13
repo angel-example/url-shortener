@@ -1,9 +1,14 @@
 <html>
+  <head>
+    <h1>{{title}}</h1>
+  </head>
   <body>
-    <form action="/create">
-      URL:<br>
-      <input type="text" name="url" value="http://www.google.com/"><br>
-      <input type="submit" value="Submit">
+    <form action="/create" method="post">
+      URL:
+      <input type="text" name="url" value="http://www.google.com/">
+      <input type="submit" value="Shorten!">
+      <br>
+      <p>{{num}} URLs shortened</p>
     </form>
   </body>
 </html>
