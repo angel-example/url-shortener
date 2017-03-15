@@ -8,7 +8,6 @@ import "package:vane/vane_server.dart";
 import "package:mongo_dart/mongo_dart.dart";
 import "package:uuid/uuid.dart";
 
-final html = new ContentType("text", "html", charset: "utf-8");
 final urlRegex = new RegExp("(https?:\/\/(?:www\.|(?!www))[^\s\.]+\.[^\s]{2,}|www\.[^\s]+\.[^\s]{2,})");
 final indexT = new Template(new File("views/index.mustache"));
 final createT = new Template(new File("views/create.mustache"));
@@ -30,9 +29,7 @@ main() async {
 
 @Route("/")
 index(HttpRequest request) async {
-  request.response.headers.contentType = html;
-  request.response.write(indexT.render({"title" : "Dart URL Shortener", "num" : await urls.count()}));
-  request.response.close();
+  write(request, indexT.render({"title" : "Dart URL Shortener", "num" : await urls.count()}));
 }
 
 @Route("/create")
@@ -44,13 +41,11 @@ create(HttpRequest request) async {
 
   var url = new String.fromCharCodes((await request.toList())[0]);
   url = Uri.decodeComponent(url.substring(url.indexOf("=", 0) + 1));
-  request.response.headers.contentType = html;
 
   if (url.startsWith("www."))
     url = "http://${url}";
   if (!urlRegex.hasMatch(url)) {
-    request.response.write(errorT.render({"message" : "Invalid URL (Does your URL begin with 'http://' or 'www.'?)"}));
-    request.response.close();
+    write(request, errorT.render({"message" : "Invalid URL (Does your URL begin with 'http://' or 'www.'?)"}));
     return;
   }
 
@@ -59,8 +54,7 @@ create(HttpRequest request) async {
     id = _generateID(6);
   urls.insert({"id" : id, "url" : url});
 
-  request.response.write(createT.render({"location" : "${id}"}));
-  request.response.close();
+  write(request, createT.render({"location" : "${id}"}));
 }
 
 @Route("/{id}")
@@ -72,6 +66,12 @@ redirect(HttpRequest request, String id) async {
     request.response.redirect(Uri.parse(result["url"]));
     request.response.close();
   }
+}
+
+void write(HttpRequest request, String content) {
+  request.response.headers.contentType = new ContentType("text", "html", charset: "utf-8");
+  request.response.write(content);
+  request.response.close();
 }
 
 Future<Map> mapById(String id) {
