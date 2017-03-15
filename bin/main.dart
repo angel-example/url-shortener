@@ -1,3 +1,6 @@
+@MirrorsUsed(targets: const ["main", "Template"], override: "*")
+import "dart:mirrors";
+
 import "dart:io";
 import "dart:async";
 import "package:url_shortener/template.dart";
