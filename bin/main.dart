@@ -1,12 +1,12 @@
-@MirrorsUsed(targets: const ["main", "Template"], override: "*")
-import "dart:mirrors";
-
 import "dart:io";
 import "dart:async";
-import "package:url_shortener/template.dart";
-import "package:vane/vane_server.dart";
-import "package:mongo_dart/mongo_dart.dart";
 import "package:uuid/uuid.dart";
+import "package:url_shortener/template.dart";
+import "package:mongo_dart/mongo_dart.dart";
+import 'package:shelf_static/shelf_static.dart';
+import "package:redstone/redstone.dart";
+
+// TODO use redstone's facilities for mongodb and templating
 
 final urlRegex = new RegExp("(https?:\/\/(?:www\.|(?!www))[^\s\.]+\.[^\s]{2,}|www\.[^\s]+\.[^\s]{2,})");
 final indexT = new Template(new File("views/index.mustache"));
@@ -15,7 +15,7 @@ final errorT = new Template(new File("views/error.mustache"));
 
 DbCollection urls;
 
-main() async {
+Future<dynamic> main() async {
   int port = 27017;
   String host = "localhost";
   String addr = "${host}:${port}";
@@ -23,55 +23,40 @@ main() async {
   Db db = new Db("mongodb://${addr}/urlshortenerdb");
   await db.open();
   urls = db.collection("urls");
-  serve();
-  // db.close();
+
+  setShelfHandler(createStaticHandler("dist", serveFilesOutsidePath: true));
+  setupConsoleLog();
+  start(port: 9090);
 }
 
-@Route("/")
-index(HttpRequest request) async {
-  write(request, indexT.render({"title" : "Dart URL Shortener", "num" : await urls.count()}));
+@Route("/", responseType: "text/html")
+Future<dynamic> index() async {
+  return indexT.render({"title" : "Dart URL Shortener", "num" : await urls.count()});
 }
 
-@Route("/create")
-create(HttpRequest request) async {
-  if (request.method != "POST") {
-    request.response.close();
-    return;
-  }
-
-  var url = new String.fromCharCodes((await request.toList())[0]);
+@Route("/create", methods: const [POST], responseType: "text/html")
+Future<dynamic> create() async {
+  var url = request.body["url"];
   url = Uri.decodeComponent(url.substring(url.indexOf("=", 0) + 1));
 
   if (url.startsWith("www."))
     url = "http://${url}";
-  if (!urlRegex.hasMatch(url)) {
-    write(request, errorT.render({"message" : "Invalid URL (Does your URL begin with 'http://' or 'www.'?)"}));
-    return;
-  }
+  if (!urlRegex.hasMatch(url))
+    return errorT.render({"message" : "Invalid URL (Does your URL begin with 'http://' or 'www.'?)"});
 
   var id = _generateID(6);
   while (await mapById(id) != null)
     id = _generateID(6);
   urls.insert({"id" : id, "url" : url});
 
-  write(request, createT.render({"location" : "${id}"}));
+  return createT.render({"location" : "${id}"});
 }
 
-@Route("/{id}")
-redirect(HttpRequest request, String id) async {
-  if (id == "favicon.ico")
-    return;
+@Route("/:id")
+Future<dynamic> redir(String id) async {
   var result = await mapById(id);
-  if (result != null) {
-    request.response.redirect(Uri.parse(result["url"]));
-    request.response.close();
-  }
-}
-
-void write(HttpRequest request, String content) {
-  request.response.headers.contentType = new ContentType("text", "html", charset: "utf-8");
-  request.response.write(content);
-  request.response.close();
+  if (result != null)
+    return redirect(Uri.parse(result["url"]).toString());
 }
 
 Future<Map> mapById(String id) {
