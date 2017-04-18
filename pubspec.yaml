@@ -1,8 +1,5 @@
 name: url_shortener
 description: nah
+publish_to: none
 dependencies:
-  redstone: "^0.6.4"
-  mustache4dart: '>= 1.0.0 < 2.0.0'
-  uuid: 0.5.3
-  mongo_dart: 0.2.10
-  shelf: 0.6.7+2
+  angel_common: ^1.0.0
